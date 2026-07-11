@@ -14,6 +14,7 @@
     html { scroll-behavior: smooth; }
     body { background: var(--bg); color: var(--text); font-family: var(--mono); overflow-x: hidden; cursor: crosshair; }
     #matrix-canvas { position: fixed; inset: 0; z-index: 0; opacity: .06; pointer-events: none; }
+    #neural-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
     body::after { content:''; position:fixed; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.1) 3px,rgba(0,0,0,.1) 4px); pointer-events:none; z-index:9999; }
 
     /* ── TOP NAV ── */
@@ -152,6 +153,27 @@
 
     @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 
+    /* ── NEURAL NET TERMINAL ── */
+    .netterm-section { padding:4rem 4rem 1rem; border-top:1px solid var(--border); }
+    .netterm-box {
+      border:1px solid var(--border); background:rgba(13,13,13,.92);
+      padding:1.25rem 1.5rem; height:220px; overflow:hidden;
+      position:relative; box-shadow:0 0 30px rgba(0,255,65,.03) inset;
+    }
+    .netterm-box::after {
+      content:''; position:absolute; inset:0; pointer-events:none;
+      background:linear-gradient(180deg,transparent 70%,rgba(13,13,13,.95) 100%);
+    }
+    .nt-log { display:flex; flex-direction:column; gap:.15rem; }
+    .nt-line {
+      font-size:.7rem; line-height:1.9; color:var(--accent);
+      opacity:0; animation:ntFadeIn .25s ease forwards;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .nt-line .k { color:var(--accent3); }
+    @keyframes ntFadeIn { from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+    .nt-cursor { display:inline-block; width:7px; height:11px; background:var(--accent); animation:blink 1s step-end infinite; vertical-align:middle; margin-left:1px; }
+
     /* ── QUICK LINKS SECTION ── */
     .quick { padding:5rem 4rem; border-top:1px solid var(--border); }
     .sec-head { display:flex; align-items:center; gap:1rem; margin-bottom:2.5rem; }
@@ -187,6 +209,13 @@
     .stat-num { font-family:var(--display); font-size:2rem; font-weight:900; color:var(--accent); line-height:1; margin-bottom:.4rem; }
     .stat-lbl { font-size:.6rem; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; }
 
+    /* ── SCROLL REVEAL ── */
+    .quick-card, .stat-box { opacity:0; transform:translateY(18px); transition:opacity .55s ease, transform .55s ease, background .3s; }
+    .quick-card.in-view, .stat-box.in-view { opacity:1; transform:translateY(0); }
+    .about-text h2, .about-text p { opacity:0; transform:translateY(14px); transition:opacity .6s ease, transform .6s ease; }
+    .about-text.in-view h2, .about-text.in-view p { opacity:1; transform:translateY(0); }
+    .about-text.in-view p:nth-of-type(2) { transition-delay:.12s; }
+
     /* ── FOOTER ── */
     footer { border-top:1px solid var(--border); padding:1.75rem 4rem; display:flex; justify-content:space-between; align-items:center; font-size:.62rem; color:var(--muted); flex-wrap:wrap; gap:1rem; position:relative; z-index:1; }
     footer .acc { color:var(--accent); }
@@ -200,10 +229,12 @@
       .about-strip { padding:3.5rem 1.5rem; grid-template-columns:1fr; gap:2.5rem; }
       footer { padding:1.5rem; flex-direction:column; text-align:center; }
     }
-  </style>
+  
+</style>
 </head>
 <body>
 <canvas id="matrix-canvas" width="1889" height="975"></canvas>
+<div id="neural-canvas"></div>
 
 <!-- TOP NAV -->
 <nav class="topnav">
@@ -211,6 +242,7 @@
   <div class="topnav-right">
     <a href="projects.html" class="hide-mob">Projects</a>
     <a href="tools.html" class="hide-mob">Tools</a>
+    <a href="tools.html#speedtest" class="hide-mob">⚡ Speed</a>
     <a href="license.html" class="hide-mob">License</a>
     <a href="contact.html" class="msg-btn">✉ Message</a>
     <button class="ham-btn" id="hamBtn" onclick="toggleSidebar()">
@@ -236,6 +268,9 @@
     </a>
     <a href="tools.html" class="sidebar-link">
       <span class="icon">⚙</span> Tools <span class="badge">12</span>
+    </a>
+    <a href="tools.html#speedtest" class="sidebar-link">
+      <span class="icon">⚡</span> Speed Test
     </a>
     <a href="license.html" class="sidebar-link">
       <span class="icon">⚖</span> License
@@ -274,6 +309,18 @@
       <a href="contact.html" class="btn bg">✉ Send Message</a>
     </div>
   </div>
+
+  <!-- NEURAL NET TERMINAL -->
+  <section class="netterm-section">
+    <div class="sec-head">
+      <span class="sec-num">00</span>
+      <h2 class="sec-title">NEURAL NET // LIVE FEED</h2>
+      <div class="sec-line"></div>
+    </div>
+    <div class="netterm-box">
+      <div class="nt-log" id="ntLog"></div>
+    </div>
+  </section>
 
   <!-- QUICK LINKS -->
   <section class="quick">
@@ -332,6 +379,7 @@
   </footer>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
   // Matrix rain
   const canvas = document.getElementById('matrix-canvas');
@@ -351,7 +399,219 @@
       drops[i]++;
     }
   }
-  setInterval(draw,50);
+  let __lastT=0;function __loop(now){requestAnimationFrame(__loop);if(now-__lastT<33)return;__lastT=now;draw();}requestAnimationFrame(__loop);
+
+  // Scroll-reveal for quick-links, stats, and about text
+  const revealObserver = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting){
+        entry.target.classList.add('in-view');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold:0.15, rootMargin:'0px 0px -40px 0px' });
+  document.querySelectorAll('.quick-card, .stat-box, .about-text').forEach((el,i)=>{
+    el.style.transitionDelay = Math.min(i*45,300)+'ms';
+    revealObserver.observe(el);
+  });
+
+  // Neural networking terminal — live typing log, smooth char-by-char reveal
+  (function(){
+    const logEl = document.getElementById('ntLog');
+    if(!logEl) return;
+    const rand = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+    const templates = [
+      () => `<span class="k">[NEURAL_NET]</span> synapse established: node_${rand(10,99)} <-> node_${rand(10,99)}`,
+      () => `<span class="k">[NEURAL_NET]</span> packet routed — latency ${rand(4,38)}ms`,
+      () => `<span class="k">[NEURAL_NET]</span> weight update pass complete — loss 0.0${rand(10,89)}`,
+      () => `<span class="k">[NEURAL_NET]</span> anomaly scan across ${rand(40,160)} nodes — clean`,
+      () => `<span class="k">[NEURAL_NET]</span> gradient sync: cluster_${rand(1,6)} to cluster_${rand(1,6)}`,
+      () => `<span class="k">[NEURAL_NET]</span> active connections: ${rand(60,220)}`,
+      () => `<span class="k">[NEURAL_NET]</span> inference batch complete — ${rand(90,99)}.${rand(0,9)}% confidence`,
+      () => `<span class="k">[NEURAL_NET]</span> handshake ok — throughput ${rand(80,940)}Mbps`,
+    ];
+
+    const MAX_LINES = 7;
+    let lines = [];
+
+    function trimLines(){
+      while(lines.length > MAX_LINES){
+        const old = lines.shift();
+        if(old && old.parentNode) old.remove();
+      }
+    }
+
+    function typeLine(html, done){
+      const plain = html.replace(/<[^>]*>/g,'');
+      const el = document.createElement('div');
+      el.className = 'nt-line';
+      logEl.appendChild(el);
+      lines.push(el);
+      trimLines();
+
+      let i = 0;
+      // build the html incrementally by tracking char position within the plain text,
+      // but render the styled prefix immediately once its char count is reached
+      function step(){
+        i++;
+        if(i <= plain.length){
+          // reveal proportionally: swap in full html once fully typed, plain text meanwhile
+          el.textContent = plain.slice(0, i);
+          setTimeout(step, 10 + Math.random()*14);
+        } else {
+          el.innerHTML = html + '<span class="nt-cursor"></span>';
+          setTimeout(()=>{
+            const cur = el.querySelector('.nt-cursor');
+            if(cur) cur.remove();
+          }, 350);
+          done && done();
+        }
+      }
+      step();
+    }
+
+    function loop(){
+      typeLine(templates[rand(0, templates.length-1)](), ()=>{
+        setTimeout(loop, 450 + Math.random()*550);
+      });
+    }
+    loop();
+  })();
+
+  // Neural network — REAL 3D WebGL scene (Three.js), floating node graph you can see depth in
+  (function initScene(){
+    const mount = document.getElementById('neural-canvas');
+    if(!mount) return;
+    if(typeof THREE === 'undefined'){ setTimeout(initScene, 200); return; }
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
+    camera.position.z = 26;
+
+    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    mount.appendChild(renderer.domElement);
+
+    // Nodes: scattered in a 3D volume
+    const NODE_COUNT = Math.min(90, Math.max(30, Math.floor((window.innerWidth*window.innerHeight)/16000)));
+    const nodes = [];
+    const nodeGeo = new THREE.SphereGeometry(0.13, 6, 6);
+    const nodeMat = new THREE.MeshBasicMaterial({ color:0x00ff41, transparent:true, opacity:0.85 });
+    const group = new THREE.Group();
+    scene.add(group);
+
+    for(let i=0;i<NODE_COUNT;i++){
+      const mesh = new THREE.Mesh(nodeGeo, nodeMat);
+      const pos = new THREE.Vector3(
+        (Math.random()-0.5)*34,
+        (Math.random()-0.5)*20,
+        (Math.random()-0.5)*18
+      );
+      mesh.position.copy(pos);
+      const vel = new THREE.Vector3((Math.random()-0.5)*0.012,(Math.random()-0.5)*0.012,(Math.random()-0.5)*0.012);
+      nodes.push({ mesh, vel });
+      group.add(mesh);
+    }
+
+    // Edges: LineSegments, geometry rebuilt each frame from proximity pairs
+    const LINK_DIST = 7;
+    const maxPairs = NODE_COUNT * 8;
+    const lineGeo = new THREE.BufferGeometry();
+    const linePositions = new Float32Array(maxPairs * 2 * 3);
+    const lineColors = new Float32Array(maxPairs * 2 * 3);
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+    lineGeo.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
+    const lineMat = new THREE.LineBasicMaterial({ vertexColors:true, transparent:true, opacity:0.55 });
+    const lines = new THREE.LineSegments(lineGeo, lineMat);
+    group.add(lines);
+
+    // Pulses: small glowing spheres traveling along random active edges
+    const PULSE_COUNT = 10;
+    const pulseGeo = new THREE.SphereGeometry(0.16, 6, 6);
+    const pulseMat = new THREE.MeshBasicMaterial({ color:0x00cfff, transparent:true, opacity:0.9 });
+    const pulses = [];
+    for(let i=0;i<PULSE_COUNT;i++){
+      const mesh = new THREE.Mesh(pulseGeo, pulseMat);
+      mesh.visible = false;
+      group.add(mesh);
+      pulses.push({ mesh, a:null, b:null, t:1 });
+    }
+
+    let lastEdges = [];
+    function rebuildEdges(){
+      let count = 0;
+      lastEdges = [];
+      for(let i=0;i<nodes.length && count<maxPairs;i++){
+        for(let j=i+1;j<nodes.length && count<maxPairs;j++){
+          const d = nodes[i].mesh.position.distanceTo(nodes[j].mesh.position);
+          if(d < LINK_DIST){
+            const o = count*6;
+            linePositions[o]   = nodes[i].mesh.position.x;
+            linePositions[o+1] = nodes[i].mesh.position.y;
+            linePositions[o+2] = nodes[i].mesh.position.z;
+            linePositions[o+3] = nodes[j].mesh.position.x;
+            linePositions[o+4] = nodes[j].mesh.position.y;
+            linePositions[o+5] = nodes[j].mesh.position.z;
+            const alpha = 1 - d/LINK_DIST;
+            lineColors[o]   = 0; lineColors[o+1] = alpha; lineColors[o+2] = alpha*0.25;
+            lineColors[o+3] = 0; lineColors[o+4] = alpha; lineColors[o+5] = alpha*0.25;
+            lastEdges.push([i,j]);
+            count++;
+          }
+        }
+      }
+      lineGeo.setDrawRange(0, count*2);
+      lineGeo.attributes.position.needsUpdate = true;
+      lineGeo.attributes.color.needsUpdate = true;
+    }
+
+    function spawnPulse(p){
+      if(lastEdges.length === 0) return;
+      const [i,j] = lastEdges[Math.floor(Math.random()*lastEdges.length)];
+      p.a = nodes[i].mesh.position; p.b = nodes[j].mesh.position; p.t = 0;
+      p.mesh.visible = true;
+    }
+
+    window.addEventListener('resize', ()=>{
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const clock = new THREE.Clock();
+    let edgeTimer = 0;
+    function animate(){
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      edgeTimer += dt;
+
+      nodes.forEach(n=>{
+        n.mesh.position.add(n.vel);
+        if(Math.abs(n.mesh.position.x) > 17) n.vel.x *= -1;
+        if(Math.abs(n.mesh.position.y) > 10) n.vel.y *= -1;
+        if(Math.abs(n.mesh.position.z) > 9)  n.vel.z *= -1;
+      });
+
+      if(edgeTimer > 0.12){ edgeTimer = 0; rebuildEdges(); }
+
+      pulses.forEach(p=>{
+        if(p.t >= 1){
+          if(Math.random() < 0.02) spawnPulse(p);
+          else p.mesh.visible = false;
+          return;
+        }
+        p.t += dt * 0.6;
+        p.mesh.position.lerpVectors(p.a, p.b, Math.min(p.t,1));
+      });
+
+      group.rotation.y += dt * 0.035;
+      group.rotation.x = Math.sin(clock.elapsedTime*0.08)*0.08;
+
+      renderer.render(scene, camera);
+    }
+    animate();
+  })();
 
   // Sidebar
   const sidebar=document.getElementById('sidebar');

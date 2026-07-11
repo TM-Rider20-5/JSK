@@ -10,7 +10,7 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     html{scroll-behavior:smooth;}
     body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:hidden;cursor:crosshair;}
-    #matrix-canvas{position:fixed;inset:0;z-index:0;opacity:.05;pointer-events:none;}
+    #matrix-canvas{position:fixed;inset:0;z-index:0;opacity:.05;pointer-events:none;}#neural-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
     body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.1) 3px,rgba(0,0,0,.1) 4px);pointer-events:none;z-index:9999;}
     .topnav{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:56px;border-bottom:1px solid var(--border);background:rgba(5,5,5,.95);backdrop-filter:blur(16px);}
     .topnav-logo{font-family:var(--display);font-weight:900;font-size:.85rem;color:var(--accent);text-decoration:none;letter-spacing:.15em;text-shadow:0 0 12px rgba(0,255,65,.5);}
@@ -133,15 +133,18 @@
     footer .acc{color:var(--accent);}
     @media(max-width:1100px){.content{grid-template-columns:1fr;}.right-col{position:static;}}
     @media(max-width:768px){.topnav-right .hide-mob{display:none;}.ham-btn{display:flex;}.project-hero{padding:7rem 1.5rem 3rem;}.content{padding:2rem 1.5rem 4rem;}.tech-grid{grid-template-columns:1fr;}footer{padding:1.5rem;flex-direction:column;text-align:center;}}
-  </style>
+  
+</style>
 </head>
 <body>
 <canvas id="matrix-canvas"></canvas>
+<div id="neural-canvas"></div>
 <nav class="topnav">
   <a class="topnav-logo" href="index.html">JSK</a>
   <div class="topnav-right">
     <a href="projects.html" class="hide-mob">Projects</a>
     <a href="tools.html" class="hide-mob">Tools</a>
+    <a href="tools.html#speedtest" class="hide-mob">⚡ Speed</a>
     <a href="license.html" class="hide-mob">License</a>
     <a href="contact.html" class="msg-btn">✉ Message</a>
     <button class="ham-btn" id="hamBtn" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
@@ -158,6 +161,7 @@
     <a href="index.html" class="sidebar-link"><span class="icon">⌂</span> Intro</a>
     <a href="projects.html" class="sidebar-link active"><span class="icon">◈</span> Projects <span class="badge">6</span></a>
     <a href="tools.html" class="sidebar-link"><span class="icon">⚙</span> Tools <span class="badge">12</span></a>
+    <a href="tools.html#speedtest" class="sidebar-link"><span class="icon">⚡</span> Speed Test</a>
     <a href="license.html" class="sidebar-link"><span class="icon">⚖</span> License</a>
     <a href="contact.html" class="sidebar-link"><span class="icon">✉</span> Send Message</a>
   </nav>
@@ -266,17 +270,75 @@
   </div>
   <footer><span>© 2026 <span class="acc">Jayanthan Sailentra Karthikeyan</span>. All rights reserved.</span><span><a href="projects.html" style="color:var(--muted);text-decoration:none;">← Back to Projects</a></span></footer>
 </main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
   const canvas=document.getElementById('matrix-canvas'),ctx=canvas.getContext('2d');
   function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}resize();window.addEventListener('resize',resize);
   const chars='アイウエオABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&';const fs=13;let drops=[];
   function initD(){drops=Array(Math.floor(canvas.width/fs)).fill(1);}initD();window.addEventListener('resize',initD);
-  function draw(){ctx.fillStyle='rgba(5,5,5,0.05)';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#00ff41';ctx.font=fs+'px Share Tech Mono';for(let i=0;i<drops.length;i++){ctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*fs,drops[i]*fs);if(drops[i]*fs>canvas.height&&Math.random()>.975)drops[i]=0;drops[i]++;}}setInterval(draw,50);
+  function draw(){ctx.fillStyle='rgba(5,5,5,0.05)';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#00ff41';ctx.font=fs+'px Share Tech Mono';for(let i=0;i<drops.length;i++){ctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*fs,drops[i]*fs);if(drops[i]*fs>canvas.height&&Math.random()>.975)drops[i]=0;drops[i]++;}}let __lastT=0;function __loop(now){requestAnimationFrame(__loop);if(now-__lastT<33)return;__lastT=now;draw();}requestAnimationFrame(__loop);
+
+  (function initScene(){
+    var mount=document.getElementById('neural-canvas');
+    if(!mount) return;
+    if(typeof THREE==='undefined'){ setTimeout(initScene, 200); return; }
+    var __small = window.innerWidth < 480;
+    var scene=new THREE.Scene();
+    var camera=new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,0.1,100);
+    camera.position.set(0,6,14);
+    camera.lookAt(0,0,-10);
+    var renderer=new THREE.WebGLRenderer({antialias:false,alpha:true});
+    renderer.setSize(window.innerWidth,window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.5));
+    mount.appendChild(renderer.domElement);
+
+    var geo=new THREE.PlaneGeometry(40,70,__small?10:18,__small?15:26);
+    geo.rotateX(-Math.PI/2);
+    var wire=new THREE.WireframeGeometry(geo);
+    var mat=new THREE.LineBasicMaterial({color:0x00ff41,transparent:true,opacity:0.45});
+    var grid=new THREE.LineSegments(wire,mat);
+    scene.add(grid);
+
+    window.addEventListener('resize',function(){
+      camera.aspect=window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth,window.innerHeight);
+    });
+
+    var running=true;
+    document.addEventListener('visibilitychange',function(){running=!document.hidden;});
+
+    var surgeMult=1, surgeTarget=1;
+    window.__jskWarp=function(ms){
+      surgeTarget=5;
+      setTimeout(function(){ surgeTarget=1; }, ms||1500);
+    };
+
+    var glitchT=0;
+    var clock=new THREE.Clock();
+    function animate(){
+      requestAnimationFrame(animate);
+      if(!running) return;
+      var dt=Math.min(clock.getDelta(),0.05);
+      surgeMult+=(surgeTarget-surgeMult)*Math.min(dt*4,1);
+      grid.position.z=(clock.elapsedTime*1.5*surgeMult)%4;
+      grid.rotation.y=Math.sin(clock.elapsedTime*0.05)*0.05;
+      glitchT+=dt*surgeMult;
+      if(glitchT>2+Math.random()*3){
+        glitchT=0;
+        mat.opacity=0.08;
+        setTimeout(function(){mat.opacity=0.45;},60);
+      }
+      renderer.render(scene,camera);
+    }
+    animate();
+  })();
+
   const sidebar=document.getElementById('sidebar'),overlay=document.getElementById('overlay'),hamBtn=document.getElementById('hamBtn');
   function toggleSidebar(){const o=sidebar.classList.toggle('open');overlay.classList.toggle('show',o);hamBtn.classList.toggle('open',o);document.body.style.overflow=o?'hidden':'';}
   function setErr(id,errId,show){document.getElementById(id).classList.toggle('invalid',show);document.getElementById(errId).style.display=show?'block':'none';}
   function validate(){const name=document.getElementById('rname').value.trim(),email=document.getElementById('remail').value.trim(),purpose=document.getElementById('rpurpose').value,msg=document.getElementById('rmessage').value.trim(),rx=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;let ok=true;setErr('rname','rname-err',!name);if(!name)ok=false;setErr('remail','remail-err',!rx.test(email));if(!rx.test(email))ok=false;setErr('rpurpose','rpurpose-err',!purpose);if(!purpose)ok=false;setErr('rmessage','rmessage-err',msg.length<10);if(msg.length<10)ok=false;return ok;}
-  function sendRequest(){if(!validate())return;const btn=document.getElementById('reqBtn'),btnText=document.getElementById('reqBtnText');btn.disabled=true;btnText.textContent='TRANSMITTING...';const name=document.getElementById('rname').value.trim(),email=document.getElementById('remail').value.trim(),purpose=document.getElementById('rpurpose').value,msg=document.getElementById('rmessage').value.trim();const body=encodeURIComponent('NetPhantom Access Request\n\nName: '+name+'\nEmail: '+email+'\nPurpose: '+purpose+'\n\nDetails:\n'+msg);const sub=encodeURIComponent('[NetPhantom Access Request] '+purpose+' — '+name);window.location.href='mailto:jayanthansailentra8@gmail.com?subject='+sub+'&body='+body;setTimeout(()=>{document.getElementById('reqBody').classList.add('hide');document.getElementById('reqSuccess').classList.add('show');},1200);}
+  function sendRequest(){if(!validate())return;const btn=document.getElementById('reqBtn'),btnText=document.getElementById('reqBtnText');btn.disabled=true;btnText.textContent='TRANSMITTING...';if(window.__jskWarp)window.__jskWarp(1500);const name=document.getElementById('rname').value.trim(),email=document.getElementById('remail').value.trim(),purpose=document.getElementById('rpurpose').value,msg=document.getElementById('rmessage').value.trim();const body=encodeURIComponent('NetPhantom Access Request\n\nName: '+name+'\nEmail: '+email+'\nPurpose: '+purpose+'\n\nDetails:\n'+msg);const sub=encodeURIComponent('[NetPhantom Access Request] '+purpose+' — '+name);window.location.href='mailto:jayanthansailentra8@gmail.com?subject='+sub+'&body='+body;setTimeout(()=>{document.getElementById('reqBody').classList.add('hide');document.getElementById('reqSuccess').classList.add('show');},1200);}
   function resetRequest(){['rname','remail','rmessage'].forEach(id=>{document.getElementById(id).value='';document.getElementById(id).classList.remove('invalid');});document.getElementById('rpurpose').value='';document.getElementById('rpurpose').classList.remove('invalid');['rname-err','remail-err','rpurpose-err','rmessage-err'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('reqBtn').disabled=false;document.getElementById('reqBtnText').textContent='SEND REQUEST ›';document.getElementById('reqBody').classList.remove('hide');document.getElementById('reqSuccess').classList.remove('show');}
   ['rname','remail','rmessage'].forEach(id=>{document.getElementById(id).addEventListener('input',()=>document.getElementById(id).classList.remove('invalid'));});
   document.getElementById('rpurpose').addEventListener('change',()=>{document.getElementById('rpurpose').classList.remove('invalid');document.getElementById('rpurpose-err').style.display='none';});

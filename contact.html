@@ -10,7 +10,7 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     html{scroll-behavior:smooth;}
     body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:hidden;cursor:crosshair;}
-    #matrix-canvas{position:fixed;inset:0;z-index:0;opacity:.04;pointer-events:none;}
+    #matrix-canvas{position:fixed;inset:0;z-index:0;opacity:.04;pointer-events:none;}#neural-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
     body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.1) 3px,rgba(0,0,0,.1) 4px);pointer-events:none;z-index:9999;}
 
     .topnav{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:56px;border-bottom:1px solid var(--border);background:rgba(5,5,5,.95);backdrop-filter:blur(16px);}
@@ -138,15 +138,18 @@
       .form-row{grid-template-columns:1fr;}
       footer{padding:1.5rem;flex-direction:column;text-align:center;}
     }
-  </style>
+  
+</style>
 </head>
 <body>
 <canvas id="matrix-canvas"></canvas>
+<div id="neural-canvas"></div>
 <nav class="topnav">
   <a class="topnav-logo" href="index.html">JSK</a>
   <div class="topnav-right">
     <a href="projects.html" class="hide-mob">Projects</a>
     <a href="tools.html" class="hide-mob">Tools</a>
+    <a href="tools.html#speedtest" class="hide-mob">⚡ Speed</a>
     <a href="license.html" class="hide-mob">License</a>
     <a href="contact.html" class="msg-btn active">✉ Message</a>
     <button class="ham-btn" id="hamBtn" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
@@ -163,6 +166,7 @@
     <a href="index.html" class="sidebar-link"><span class="icon">⌂</span> Intro</a>
     <a href="projects.html" class="sidebar-link"><span class="icon">◈</span> Projects <span class="badge">6</span></a>
     <a href="tools.html" class="sidebar-link"><span class="icon">⚙</span> Tools <span class="badge">12</span></a>
+    <a href="tools.html#speedtest" class="sidebar-link"><span class="icon">⚡</span> Speed Test</a>
     <a href="license.html" class="sidebar-link"><span class="icon">⚖</span> License</a>
     <a href="contact.html" class="sidebar-link active"><span class="icon">✉</span> Send Message</a>
   </nav>
@@ -290,6 +294,7 @@
   </footer>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
   const canvas=document.getElementById('matrix-canvas'),ctx=canvas.getContext('2d');
   function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
@@ -299,7 +304,64 @@
   function initD(){drops=Array(Math.floor(canvas.width/fs)).fill(1);}
   initD();window.addEventListener('resize',initD);
   function draw(){ctx.fillStyle='rgba(5,5,5,0.05)';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#00ff41';ctx.font=fs+'px Share Tech Mono';for(let i=0;i<drops.length;i++){ctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*fs,drops[i]*fs);if(drops[i]*fs>canvas.height&&Math.random()>.975)drops[i]=0;drops[i]++;}}
-  setInterval(draw,50);
+  let __lastT=0;function __loop(now){requestAnimationFrame(__loop);if(now-__lastT<33)return;__lastT=now;draw();}requestAnimationFrame(__loop);
+
+  (function initScene(){
+    var mount=document.getElementById('neural-canvas');
+    if(!mount) return;
+    if(typeof THREE==='undefined'){ setTimeout(initScene, 200); return; }
+    var __small = window.innerWidth < 480;
+    var scene=new THREE.Scene();
+    var camera=new THREE.PerspectiveCamera(65,window.innerWidth/window.innerHeight,0.1,60);
+    var renderer=new THREE.WebGLRenderer({antialias:false,alpha:true});
+    renderer.setSize(window.innerWidth,window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.5));
+    mount.appendChild(renderer.domElement);
+
+    var COUNT=__small?33:60;
+    var geo=new THREE.BufferGeometry();
+    var pos=new Float32Array(COUNT*3);
+    var speeds=new Float32Array(COUNT);
+    for(var i=0;i<COUNT;i++){
+      var a=Math.random()*Math.PI*2, r=2+Math.random()*6;
+      pos[i*3]=Math.cos(a)*r; pos[i*3+1]=Math.sin(a)*r; pos[i*3+2]=-Math.random()*40;
+      speeds[i]=0.06+Math.random()*0.1;
+    }
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    var mat=new THREE.PointsMaterial({color:0x00ff41,size:__small?0.22:0.16,transparent:true,opacity:Math.max(0.45,0.8)});
+    var points=new THREE.Points(geo,mat);
+    scene.add(points);
+
+    window.addEventListener('resize',function(){
+      camera.aspect=window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth,window.innerHeight);
+    });
+
+    var running=true;
+    document.addEventListener('visibilitychange',function(){running=!document.hidden;});
+
+    var clock=new THREE.Clock();
+    function animate(){
+      requestAnimationFrame(animate);
+      if(!running) return;
+      var dt=Math.min(clock.getDelta(),0.05);
+      var arr=geo.attributes.position.array;
+      for(var i=0;i<COUNT;i++){
+        arr[i*3+2]+=speeds[i]*dt*60;
+        if(arr[i*3+2]>2){
+          arr[i*3+2]=-40;
+          var a=Math.random()*Math.PI*2,r=2+Math.random()*6;
+          arr[i*3]=Math.cos(a)*r; arr[i*3+1]=Math.sin(a)*r;
+        }
+      }
+      geo.attributes.position.needsUpdate=true;
+      camera.rotation.z+=dt*0.02;
+      renderer.render(scene,camera);
+    }
+    animate();
+  })();
+
 
   const sidebar=document.getElementById('sidebar'),overlay=document.getElementById('overlay'),hamBtn=document.getElementById('hamBtn');
   function toggleSidebar(){const o=sidebar.classList.toggle('open');overlay.classList.toggle('show',o);hamBtn.classList.toggle('open',o);document.body.style.overflow=o?'hidden':'';}
